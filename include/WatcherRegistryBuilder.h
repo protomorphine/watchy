@@ -9,18 +9,18 @@
  */
 class WatcherRegistryBuilder {
 public:
-  /**
-   * @brief Adds a given entry to registry.
-   * @param entry Wathcher entry.
-   */
-  void Add(const WatcherEntry &entry);
+    /**
+     * @brief Adds a given entry to registry.
+     * @param entry Wathcher entry.
+     */
+    auto Add(const WatcherEntry& entry) -> void;
 
-  /**
-   * @brief Creates a registry.
-   * @return New instance of WatcherRegistry.
-   */
-  const WatcherRegistry Build();
+    /**
+     * @brief Creates a registry.
+     * @return New instance of WatcherRegistry.
+     */
+    [[nodiscard]] auto Build() -> WatcherRegistry;
 
 private:
-  std::vector<WatcherEntry> m_entries;
+    std::vector<WatcherEntry> entries_;
 };

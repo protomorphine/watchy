@@ -10,11 +10,17 @@
  */
 class WatcherRegistry {
 public:
-  explicit WatcherRegistry(std::vector<WatcherEntry> &entries);
+    /**
+     * @brief Creates new instance of WatcherRegistry.
+     * @param entries Entries.
+     */
+    explicit WatcherRegistry(std::vector<WatcherEntry>& entries);
 
-  const std::vector<WatcherEntry> &GetEntries() { return m_entries; }
+    /**
+     * @brief Returns available entries.
+     */
+    auto GetEntries() -> const std::vector<WatcherEntry>&;
 
 private:
-  std::vector<WatcherEntry> &m_entries;
+    std::vector<WatcherEntry>& entries_;
 };
-

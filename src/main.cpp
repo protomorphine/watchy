@@ -1,23 +1,17 @@
-#include <iostream>
-
-#include "WatcherRegistry.h"
+#include "Watcher.h"
 #include "WatcherRegistryBuilder.h"
 #include "spdlog/spdlog.h"
 
-int main() {
-  spdlog::info("starting watchy app");
+auto main() -> int {
+    spdlog::info("Starting watchy app");
 
-  WatcherRegistryBuilder builder{};
-  builder.Add(WatcherEntry("/home/drzaytsev/work/watchy/", "ls"));
+    WatcherRegistryBuilder builder;
+    builder.Add(WatcherEntry("/home/drzaytsev/work/watchy", "ls"));
 
-  auto registry = builder.Build();
+    auto registry = builder.Build();
 
-  auto registeredEntries = registry.GetEntries();
+    Watcher watcher{registry};
+    watcher.Start();
 
-  for (int i = 0; i < registeredEntries.size(); ++i) {
-    WatcherEntry &entry = registeredEntries[i];
-    std::cout << entry.FilePath << " -> " << entry.Command << std::endl;
-  }
-
-  return 0;
+    return 0;
 }

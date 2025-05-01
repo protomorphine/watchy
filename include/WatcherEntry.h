@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <string>
+#include <utility>
 
 /**
  * @class WatcherEntry
@@ -9,15 +10,22 @@
  */
 class WatcherEntry {
 public:
-  /**
-   * @brief Creates new instance of WatcherEntry.
-   *
-   * @param path Path to watch.
-   * @param command Command to execute on watcher's trigger.
-   */
-  WatcherEntry(const std::filesystem::path &path, const std::string &command)
-      : FilePath(path), Command(command) { };
+    /**
+     * @brief Creates new instance of WatcherEntry.
+     *
+     * @param path Path to watch.
+     * @param command Command to execute on watcher's trigger.
+     */
+    WatcherEntry(std::filesystem::path path, std::string command)
+        : FilePath(std::move(path)), Command(std::move(command)) {};
 
-  const std::filesystem::path   FilePath;
-  const std::string             Command;
+    /**
+     * Path to directory.
+     */
+    const std::filesystem::path FilePath;
+
+    /**
+     * Command to execute on files modify.
+     */
+    const std::string Command;
 };
