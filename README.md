@@ -2,7 +2,7 @@
 
 ## build
 
-```sh 
+```sh
 ./build.sh
 ```
 
