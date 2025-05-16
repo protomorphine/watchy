@@ -1,12 +1,14 @@
 #include "Watcher.h"
 #include "WatcherRegistryBuilder.h"
+
 #include "spdlog/spdlog.h"
 
 auto main() -> int {
     spdlog::info("Starting watchy app");
 
     WatcherRegistryBuilder builder;
-    builder.Add(WatcherEntry("/home/drzaytsev/work/watchy", "ls"));
+    builder.Add(WatchedItem("/home/drzaytsev/work/watchy", "ls"));
+    builder.Add(WatchedItem("/home/drzaytsev/work/test-agent", "ls"));
 
     auto registry = builder.Build();
 

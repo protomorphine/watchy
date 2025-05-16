@@ -1,6 +1,6 @@
 #pragma once
 
-#include "WatcherEntry.h"
+#include "WatcherItem.h"
 #include "WatcherRegistry.h"
 
 /**
@@ -13,7 +13,7 @@ public:
      * @brief Adds a given entry to registry.
      * @param entry Wathcher entry.
      */
-    auto Add(const WatcherEntry& entry) -> void;
+    auto Add(const WatchedItem &entry) -> void;
 
     /**
      * @brief Creates a registry.
@@ -22,5 +22,5 @@ public:
     [[nodiscard]] auto Build() -> WatcherRegistry;
 
 private:
-    std::vector<WatcherEntry> entries_;
+    std::vector<WatchedItem> entries_;
 };

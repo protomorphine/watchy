@@ -1,4 +1,4 @@
-BasedOnStyle: Google
+BasedOnStyle: llvm
 DerivePointerAlignment: false
 IncludeBlocks: Preserve
 AttributeMacros: ["noexcept"]

@@ -1,8 +1,8 @@
 #pragma once
 
-#include <vector>
+#include "WatcherItem.h"
 
-#include "WatcherEntry.h"
+#include <vector>
 
 /**
  * @class WatcherRegistry
@@ -14,13 +14,13 @@ public:
      * @brief Creates new instance of WatcherRegistry.
      * @param entries Entries.
      */
-    explicit WatcherRegistry(std::vector<WatcherEntry>& entries);
+    explicit WatcherRegistry(std::vector<WatchedItem> &entries);
 
     /**
      * @brief Returns available entries.
      */
-    auto GetEntries() -> const std::vector<WatcherEntry>&;
+    [[nodiscard]] auto GetEntries() const -> const std::vector<WatchedItem> &;
 
 private:
-    std::vector<WatcherEntry>& entries_;
+    std::vector<WatchedItem> &entries_;
 };
