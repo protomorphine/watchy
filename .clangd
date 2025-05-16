@@ -1,4 +1,0 @@
-CompileFlags:
-  Add:
-    - "-I/home/drzaytsev/work/watchy/include"
-    - "-std=c++20"
