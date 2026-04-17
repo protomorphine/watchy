@@ -7,9 +7,7 @@ find_package(spdlog REQUIRED)
 
 set(SOURCES
     src/main.cpp
-    src/Watcher.cpp
-    src/WatcherRegistry.cpp
-    src/WatcherRegistryBuilder.cpp)
+    src/Watcher.cpp)
 
 add_executable(watchy ${SOURCES})
 

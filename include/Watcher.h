@@ -1,11 +1,13 @@
 #pragma once
 
 #include "WatcherItem.h"
-#include "WatcherRegistry.h"
 
 #include <array>
 #include <cstdint>
+#include <functional>
 #include <future>
+#include <optional>
+#include <stop_token>
 #include <sys/inotify.h>
 #include <thread>
 #include <unordered_map>
@@ -18,46 +20,29 @@
  */
 class Watcher {
     using WatcherDescriptor = int;
+    using StopCallback = std::stop_callback<std::function<void()>>;
 
     // Event types to handle.
     static constexpr uint32_t kWatchedEvents = IN_MODIFY | IN_CREATE;
 
 public:
-    /**
-     * @brief Creates new instance of Watcher using given registry.
-     * @param registry Registry with watcher entries.
-     */
-    explicit Watcher(WatcherRegistry &registry);
+    explicit Watcher(std::vector<WatchedItem> witems);
 
-    /**
-     * @brief Free all used resources.
-     */
     ~Watcher();
 
-    /**
-     * Starts all given watchers.
-     */
-    auto Start() -> void;
+    auto Start(const std::stop_source &ssource) -> void;
 
 private:
-    /**
-     * @brief Adds new inotify watcher.
-     * @param entry Information for watcher.
-     */
-    auto CreateInotifyWatcher(const WatchedItem &entry) -> void;
+    auto CreateInotifyWatcher(WatchedItem entry) -> void;
 
-    /**
-     * @brief Handle 'inotify' system event.
-     * @param event Event.
-     */
     auto HandleEvent(inotify_event *event) const -> void;
 
-    /**
-     * @brief Starts a loop to read and handle 'inotify' events.
-     */
-    auto ReceiveEvents() const -> void;
+    auto ReceiveEvents(const std::stop_token &stop) const -> void;
 
-    WatcherRegistry &registry_;
     WatcherDescriptor inotify_descriptor_;
-    std::unordered_map<WatcherDescriptor, const WatchedItem &> watched_items_;
+
+    std::jthread event_thread_;
+    std::optional<StopCallback> event_thread_stop_callback_;
+
+    std::unordered_map<WatcherDescriptor, WatchedItem> watched_items_;
 };
