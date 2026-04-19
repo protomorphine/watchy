@@ -1,11 +1,11 @@
 #include "Watcher.h"
-#include "WatcherItem.h"
+#include "WatchedItem.h"
 
 #include "sys/inotify.h"
 #include "unistd.h"
 #include <array>
-#include <cerrno>
 #include <cstring>
+#include <filesystem>
 #include <poll.h>
 #include <spdlog/spdlog.h>
 #include <stdexcept>
@@ -15,105 +15,99 @@
 #include <sys/select.h>
 #include <thread>
 
-Watcher::Watcher(std::vector<WatchedItem> witems) {
-    inotify_descriptor_ = inotify_init();
+Watcher::Watcher(std::vector<WatchedItem> watched_items)
+    : inotifyDescriptor_(inotify_init()) {
+  if (inotifyDescriptor_ == -1) {
+    throw std::runtime_error("Could not initialize `inotify` subsystem");
+  }
 
-    if (inotify_descriptor_ == -1) {
-        throw std::runtime_error("Could not initialize `inotify` subsystem");
+  for (auto &&entry : std::move(watched_items)) {
+    std::filesystem::path entry_path = entry.GetPath();
+
+    spdlog::info("Creating new watcher for '{}'", entry_path.string());
+    WatcherDescriptor watcher_descriptor = inotify_add_watch(
+        inotifyDescriptor_, entry_path.c_str(), kWatchedEvents);
+
+    if (watcher_descriptor == -1) {
+      spdlog::error("Failed to create watcher for '{}'", entry_path.string());
+      continue;
     }
 
-    for (auto&& entry : std::move(witems)) {
-        CreateInotifyWatcher(std::move(entry));
-    }
+    watchedItems_.emplace(watcher_descriptor, std::move(entry));
+  }
 };
 
 Watcher::~Watcher() {
-    for (auto &pair : watched_items_) {
-        inotify_rm_watch(inotify_descriptor_, pair.first);
-    }
+  for (auto &pair : watchedItems_) {
+    inotify_rm_watch(inotifyDescriptor_, pair.first);
+  }
 
-    close(inotify_descriptor_);
+  close(inotifyDescriptor_);
 };
 
-auto Watcher::CreateInotifyWatcher(WatchedItem entry) -> void {
-    spdlog::info("Creating new watcher for '{}'", entry.GetPath().string());
-    WatcherDescriptor watcher_descriptor =
-        inotify_add_watch(inotify_descriptor_, entry.GetPath().c_str(), kWatchedEvents);
+auto Watcher::Start(const std::stop_source &stop_src) -> void {
+  eventThread_ = std::jthread(
+      [this](const std::stop_token &st) -> void { ReceiveEvents(st); });
 
-    if (watcher_descriptor == -1) {
-        spdlog::error("Failed to create watcher for '{}'", entry.GetPath().string());
-        return;
-    }
+  eventThreadStopCallback_.emplace(
+      stop_src.get_token(), [this]() -> void { eventThread_.request_stop(); });
 
-    watched_items_.emplace(watcher_descriptor, std::move(entry));
+  eventThread_.join();
 }
 
-auto Watcher::Start(const std::stop_source &ssource) -> void {
-    event_thread_ = std::jthread([this](const std::stop_token &st) -> void { ReceiveEvents(st); });
+auto Watcher::ReceiveEvents(const std::stop_token &stop_tkn) const -> void {
+  constexpr size_t kBufSize = 1024;
+  std::array<char, kBufSize> buffer{};
 
-    event_thread_stop_callback_.emplace(ssource.get_token(), [this]() -> void { event_thread_.request_stop(); });
+  pollfd pfd = {.fd = inotifyDescriptor_, .events = POLLIN, .revents = 0};
 
-    event_thread_.join();
-}
+  while (!stop_tkn.stop_requested()) {
+    int poll_result = poll(&pfd, 1, kPollTimeoutMs);
 
-auto Watcher::ReceiveEvents(const std::stop_token &stop) const -> void {
-    constexpr size_t kBufSize = 1024;
-    std::array<char, kBufSize> buffer{};
-
-    pollfd pfd = {.fd = inotify_descriptor_, .events = POLLIN, .revents = 0};
-
-    while (!stop.stop_requested()) {
-        int presult = poll(&pfd, 1, 100);
-
-        if (presult == 0) {
-            continue;
-        }
-
-        if (presult < 0) {
-            spdlog::warn("poll error: {}", strerror(errno));
-            continue;
-        }
-
-        if (pfd.revents & POLLIN) {
-            size_t len = read(inotify_descriptor_, buffer.data(), kBufSize);
-
-            if (len == 0) {
-                spdlog::warn("error while reading inotify descriptor");
-                continue;
-            }
-
-            auto *event = reinterpret_cast<inotify_event *>(buffer.data());
-            HandleEvent(event);
-        }
+    if (poll_result <= 0) {
+      continue;
     }
+
+    if ((pfd.revents & POLLIN) != 0) {
+      size_t len = read(inotifyDescriptor_, buffer.data(), kBufSize);
+
+      if (len == 0) {
+        spdlog::warn("error while reading inotify descriptor");
+        continue;
+      }
+
+      auto *ev = reinterpret_cast<inotify_event *>(buffer.data());
+      HandleEvent(ev);
+    }
+  }
 };
 
-auto Watcher::HandleEvent(inotify_event *event) const -> void {
-    if (event == nullptr) {
-        spdlog::warn("Cannot handle event because given pointer is nullptr");
-        return;
-    }
+auto Watcher::HandleEvent(inotify_event *ev) const -> void {
+  if (ev == nullptr) {
+    spdlog::warn("Cannot handle event because given pointer is nullptr");
+    return;
+  }
 
-    if (!watched_items_.contains(event->wd)) {
-        spdlog::warn("unknown watcher descriptor '{0}'", event->wd);
-        return;
-    }
+  if (!watchedItems_.contains(ev->wd)) {
+    spdlog::warn("unknown watcher descriptor '{0}'", ev->wd);
+    return;
+  }
 
-    std::string path = watched_items_.at(event->wd).GetPath() / std::string(event->name);
+  std::string path = watchedItems_.at(ev->wd).GetPath() / std::string(ev->name);
 
-    switch (event->mask) {
-    // file created
-    case IN_CREATE:
-        spdlog::info("File created (wd: {0}, name: '{1}')", event->wd, path);
-        break;
+  switch (ev->mask) {
+  // file created
+  case IN_CREATE:
+    spdlog::info("File created (wd: {0}, name: '{1}')", ev->wd, path);
+    break;
 
-    // file modified
-    case IN_MODIFY:
-        spdlog::info("File changed (wd: {0}, name: '{1}')", event->wd, path);
-        break;
+  // file modified
+  case IN_MODIFY:
+    spdlog::info("File changed (wd: {0}, name: '{1}')", ev->wd, path);
+    break;
 
-    default:
-        spdlog::warn("Unsupported event (wd: {0}, name: '{1}')", event->wd, path);
-        break;
-    }
+  default:
+    spdlog::warn("Unsupported event (wd: {0}, name: '{1}')", ev->wd, path);
+    break;
+  }
 };

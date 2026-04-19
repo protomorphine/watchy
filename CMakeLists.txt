@@ -4,6 +4,7 @@ set(CMAKE_CXX_STANDARD 20)
 project(watchy)
 
 find_package(spdlog REQUIRED)
+find_package(yaml-cpp REQUIRED)
 
 set(SOURCES
     src/main.cpp
@@ -16,4 +17,5 @@ target_include_directories(watchy
         ${PROJECT_SOURCE_DIR}/include
 )
 
-target_link_libraries(watchy PRIVATE spdlog::spdlog $<$<BOOL:${MINGW}>:ws2_32>)
+target_link_libraries(watchy PRIVATE spdlog::spdlog)
+target_link_libraries(watchy PRIVATE yaml-cpp::yaml-cpp)

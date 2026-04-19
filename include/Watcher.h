@@ -1,6 +1,6 @@
 #pragma once
 
-#include "WatcherItem.h"
+#include "WatchedItem.h"
 
 #include <array>
 #include <cstdint>
@@ -19,30 +19,29 @@
  * @brief Provides a watcher subsystem.
  */
 class Watcher {
-    using WatcherDescriptor = int;
-    using StopCallback = std::stop_callback<std::function<void()>>;
+  using WatcherDescriptor = int;
+  using StopCallback = std::stop_callback<std::function<void()>>;
 
-    // Event types to handle.
-    static constexpr uint32_t kWatchedEvents = IN_MODIFY | IN_CREATE;
+  // Event types to handle.
+  static constexpr uint32_t kWatchedEvents = IN_MODIFY | IN_CREATE;
+  static constexpr int kPollTimeoutMs = 100;
 
 public:
-    explicit Watcher(std::vector<WatchedItem> witems);
+  explicit Watcher(std::vector<WatchedItem> watched_items);
 
-    ~Watcher();
+  ~Watcher();
 
-    auto Start(const std::stop_source &ssource) -> void;
+  auto Start(const std::stop_source &stop_src) -> void;
 
 private:
-    auto CreateInotifyWatcher(WatchedItem entry) -> void;
+  auto HandleEvent(inotify_event *ev) const -> void;
 
-    auto HandleEvent(inotify_event *event) const -> void;
+  auto ReceiveEvents(const std::stop_token &stop_tkn) const -> void;
 
-    auto ReceiveEvents(const std::stop_token &stop) const -> void;
+  WatcherDescriptor inotifyDescriptor_;
 
-    WatcherDescriptor inotify_descriptor_;
+  std::jthread eventThread_;
+  std::optional<StopCallback> eventThreadStopCallback_;
 
-    std::jthread event_thread_;
-    std::optional<StopCallback> event_thread_stop_callback_;
-
-    std::unordered_map<WatcherDescriptor, WatchedItem> watched_items_;
+  std::unordered_map<WatcherDescriptor, WatchedItem> watchedItems_;
 };
